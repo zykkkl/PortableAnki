@@ -1,6 +1,6 @@
 # Mini Anki OS - 导出脚本(在 Anki 的 Debug Console 里运行)
 # 打开方式:Anki 主界面按 Ctrl+Shift+;  ->  粘贴本文件全部内容 -> Ctrl+Enter
-# 作用:把指定牌组的卡 + 每卡 FSRS memory state + 牌组 FSRS 参数,导成设备格式,写到 import-pack/。
+# 作用:把指定牌组的卡 + 每卡 FSRS memory state + 牌组 FSRS 参数,导成设备格式,写到 OUT_DIR。
 # 只读 Anki 数据,不修改你的牌组。
 
 import os, json, time
@@ -9,7 +9,7 @@ from aqt import mw
 # ===== 可调参数 =====
 DECK          = "NEW-JLPT::NEW-N2"     # 要导出的牌组(用优化过、21参数的 N2)
 LIMIT         = 20                     # 先导前 N 张测试
-OUT_DIR       = r"f:/PortableAnki/import-pack"
+OUT_DIR       = r"./import-pack "
 FORCE_DUE_NOW = True                   # True=把所有卡 due 设为现在(导入后能立刻复习,测试用)
 # ====================
 

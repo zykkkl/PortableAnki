@@ -1,0 +1,5 @@
+{
+  "port": 8766,
+  "force_due_now": true,
+  "include_subdecks": true
+}

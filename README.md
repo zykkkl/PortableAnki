@@ -26,10 +26,10 @@ Online:  Sync local changes and merge with desktop Anki state
 | **FSRS-6 Scheduler** | ✅ Complete | Full C++ implementation of new / learning / review / relearning states; cross-checked against py-fsrs line-by-line |
 | **Review State Machine** | ✅ Complete | Flip → Rate (Again/Hard/Good/Easy) → Next card; learning cards reappear automatically after their short step interval |
 | **LittleFS Storage** | ✅ Complete | `cards.jsonl`, `review_state.jsonl`, `review_events.jsonl` read/write; data survives power loss |
-| **Wi-Fi Import** | ✅ Complete | HTTP download of import packs from a PC on the same LAN |
+| **Wi-Fi Import** | ✅ Complete | HTTP download from the Anki bridge plugin on the same LAN |
 | **Time & RTC** | ✅ Complete | NTP sync on cold boot; deep-sleep RTC retention means no reconnection needed after wake |
 | **Power Management** | ✅ Complete | Deep-sleep instead of power-off; RTC keeps ticking |
-| **PC Export Tool** | ✅ Complete | `anki-tools/export_debug.py` runs inside Anki Debug Console to export decks + FSRS params |
+| **PC Tools** | ✅ Complete | Anki bridge plugin plus Debug Console helper scripts |
 | **FSRS Cross-Check** | ✅ Complete | `fsrs-check/compare.py` compiles and validates C++ output against official py-fsrs |
 | **Rust FFI** | ✅ Complete | `rs-fsrs-c` wraps `rs-fsrs` via cbindgen into a C header |
 | **Serial UI** | 🔄 In Progress | Serial echo display for pre-hardware debugging; E-ink driver (GxEPD2) integration pending screen arrival |
@@ -63,7 +63,7 @@ pio run -t upload
 pio device monitor
 ```
 
-**First-time setup:** create `ESP4Anki/lib/NetTime/secrets.h` with your Wi-Fi credentials and PC IP (see `.gitignore` — never commit this file).
+**First-time setup:** create `ESP4Anki/lib/NetTime/secrets.h` with your Wi-Fi credentials, Anki bridge URL, and optional deck/limit settings (see `.gitignore` — never commit this file).
 
 ### Serial Commands (Pre-Button Phase)
 
@@ -76,7 +76,8 @@ pio device monitor
 | `4` | Rate **Easy** |
 | `z` | Deep sleep 5 s (test RTC retention) |
 | `x` | Format LittleFS and rewrite demo cards |
-| `d` | Download import pack from PC over Wi-Fi |
+| `l` | Print Anki deck list from the bridge plugin |
+| `d` | Download selected deck from Anki over Wi-Fi |
 | `u` | Upload review events back to Anki |
 
 ### Data Formats on Device
@@ -98,9 +99,10 @@ PortableAnki/
 ├── py-fsrs/           # Official Python FSRS reference implementation (MIT)
 ├── rs-fsrs-c/         # Rust FFI → C header (cbindgen)
 ├── anki-addon/        # Anki plugin (minianki_bridge): HTTP export + write-back
+│   └── dist/          # Local .ankiaddon build output (gitignored)
+├── anki-tools/        # Anki Debug Console helper scripts
 ├── fsrs-check/        # C++ vs py-fsrs cross-check tool
-├── anki-tools/        # Anki Debug Console scripts (export / write-back probe)
-└── import-pack/       # Exported data (gitignored — generated at runtime)
+└── docs/              # Plans, remaining work, archived notes
 ```
 
 ### Validation
@@ -134,10 +136,10 @@ PortableAnki 是一台**便携式离线 Anki 复习终端**。它基于 ESP32-S3
 | **FSRS-6 调度器** | ✅ 已完成 | 完整实现新卡/学习中/复习/重新学习四状态；与 py-fsrs 逐条对拍验证 |
 | **复习状态机** | ✅ 已完成 | 翻面 → 评分 → 下一张；学习中卡片按短步长自动重现 |
 | **LittleFS 存储** | ✅ 已完成 | `cards.jsonl`、`review_state.jsonl`、`review_events.jsonl` 读写；断电不丢数据 |
-| **Wi-Fi 导入** | ✅ 已完成 | 通过 HTTP 从局域网 PC 下载导入包 |
+| **Wi-Fi 导入** | ✅ 已完成 | 通过 HTTP 从局域网 Anki 插件下载卡片/状态/参数 |
 | **时间与 RTC** | ✅ 已完成 | 冷启动 NTP 对时；深睡后 RTC 保持，唤醒无需再联网 |
 | **电源管理** | ✅ 已完成 | 深睡代替关机，RTC 持续走时 |
-| **PC 导出脚本** | ✅ 已完成 | `anki-tools/export_debug.py` 在 Anki Debug Console 内运行，导出牌组与 FSRS 参数 |
+| **PC 工具** | ✅ 已完成 | Anki 桥接插件 + Debug Console 辅助脚本 |
 | **FSRS 对拍验证** | ✅ 已完成 | `fsrs-check/compare.py` 编译并验证 C++ 输出与官方 py-fsrs 一致 |
 | **Rust FFI** | ✅ 已完成 | `rs-fsrs-c` 通过 cbindgen 将 `rs-fsrs` 封装为 C 头文件 |
 | **串口 UI** | 🔄 进行中 | 串口回显用于无屏调试；GxEPD2 墨水屏驱动待屏幕到货后接入 |
@@ -171,7 +173,7 @@ pio run -t upload
 pio device monitor
 ```
 
-**首次使用：**新建 `ESP4Anki/lib/NetTime/secrets.h` 填入 Wi-Fi 密码与 PC IP（该路径已被 `.gitignore` 忽略，切勿提交到版本库）。
+**首次使用：**新建 `ESP4Anki/lib/NetTime/secrets.h` 填入 Wi-Fi 密码、Anki 插件地址和可选卡组/数量参数（该路径已被 `.gitignore` 忽略，切勿提交到版本库）。
 
 ### 串口操作（实体按键到货前）
 
@@ -184,7 +186,8 @@ pio device monitor
 | `4` | 评分 **Easy** |
 | `z` | 深睡 5 秒后唤醒（验证 RTC 保持） |
 | `x` | 格式化 LittleFS 并重写示例卡 |
-| `d` | 通过 Wi-Fi 从 PC 下载导入包 |
+| `l` | 从 Anki 插件读取并打印卡组列表 |
+| `d` | 通过 Wi-Fi 从 Anki 下载选中卡组 |
 | `u` | 上传复习记录写回 Anki |
 
 ### 设备端数据格式
@@ -206,9 +209,10 @@ PortableAnki/
 ├── py-fsrs/           # 官方 Python FSRS 参考实现（MIT 协议）
 ├── rs-fsrs-c/         # Rust FFI → C 头文件（cbindgen）
 ├── anki-addon/        # Anki 插件（minianki_bridge）：HTTP 导出 + 写回
+│   └── dist/          # 本地 .ankiaddon 打包产物（已 gitignore）
+├── anki-tools/        # Anki Debug Console 辅助脚本
 ├── fsrs-check/        # C++ 与 py-fsrs 对拍验证工具
-├── anki-tools/        # Anki Debug Console 脚本（导出 / 写回探针）
-└── import-pack/       # 导出数据（已 gitignore，运行时生成）
+└── docs/              # 规划、剩余功能、归档说明
 ```
 
 ### 验证

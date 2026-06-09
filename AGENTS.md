@@ -16,11 +16,11 @@ PortableAnki 是一个**便携式离线 Anki 复习终端**。核心目标：制
   - `rs-fsrs-c/`：Rust FFI 封装，把 `rs-fsrs` 库导出为 C 头文件（供其他 C/C++ 调用）。
   - `ESP4Anki/lib/Scheduler/`：设备端独立的 C++ 精简实现（与 py-fsrs 逐条对拍验证）。
 - **PC 端工具**
+  - `anki-addon/`：Anki 桥接插件，在 Anki 内提供 HTTP 服务供设备下载/上传。
   - `anki-tools/`：Anki Debug Console 脚本，从桌面端 Anki 导出卡片 + FSRS 参数。
-  - `import-pack/`：导出的示例数据（`cards.jsonl`、`review_state.jsonl`、`decks.json`）。
 - **对拍验证** (`fsrs-check/`)：Python 脚本 + C++ runner，验证设备端 C++ FSRS 与官方 py-fsrs 输出一致。
 
-> **注意**：`CLAUDE.md` 目前处于过期状态（它声称 `main.cpp` 仍是 PlatformIO 模板，实际上已完成大量开发），应以本文件和 `PortableAnki_V1_Plan.md` 为准。
+> **注意**：`docs/archive/CLAUDE.md` 目前处于过期归档状态（它声称 `main.cpp` 仍是 PlatformIO 模板，实际上已完成大量开发），应以本文件和 `docs/PortableAnki_V1_Plan.md` 为准。
 
 ---
 
@@ -36,7 +36,7 @@ PortableAnki/
 │   │   ├── Review/        # 复习状态机（ReviewSession）+ 会话队列（ReviewQueue）
 │   │   ├── Scheduler/     # FSRS-6 C++ 实现（Fsrs.h/cpp）+ 调度器包装（Scheduler.h/cpp）
 │   │   ├── Storage/       # LittleFS 文件读写（cards/review_state/review_events jsonl）
-│   │   ├── Sync/          # Wi-Fi HTTP 下载导入包
+│   │   ├── Sync/          # Wi-Fi HTTP 对接 Anki 插件下载/上传
 │   │   ├── NetTime/       # Wi-Fi 连网 + NTP 对时（secrets.h 放 WiFi 密码）
 │   │   ├── Clock/         # 内部 RTC 时间封装
 │   │   └── Power/         # 深度睡眠管理（用深睡代替关机，RTC 保持走时）
@@ -49,15 +49,19 @@ PortableAnki/
 │   ├── include/fsrs.h     # cbindgen 生成的 C 头（自动产出，勿手动改）
 │   ├── build.rs           # cbindgen 调用
 │   └── build.sh           # 一键编译 + 运行 C 示例 + 生成覆盖率
-├── import-pack/           # 设备导入包示例（从 Anki 导出后放到这里）
-│   ├── cards.jsonl
-│   ├── review_state.jsonl
-│   └── decks.json
-├── anki-tools/            # Anki 导出脚本
-│   └── export_debug.py    # 在 Anki Debug Console 运行，导出当前牌组到 import-pack/
-└── fsrs-check/            # C++ FSRS 与 py-fsrs 对拍工具
-    ├── compare.py
-    └── runner.cpp
+├── anki-addon/            # Anki 插件（minianki_bridge）
+│   ├── minianki_bridge/   # 插件源码与默认配置
+│   └── dist/              # 本地 .ankiaddon 打包产物（gitignored）
+├── anki-tools/            # Anki Debug Console 辅助脚本
+│   ├── export_debug.py
+│   └── probe_writeback.py
+├── fsrs-check/            # C++ FSRS 与 py-fsrs 对拍工具
+│   ├── compare.py
+│   └── runner.cpp
+├── docs/                  # 规划、剩余功能和归档文档
+│   ├── PortableAnki_V1_Plan.md
+│   ├── PortableAnki_Remaining_Work.md
+│   └── archive/CLAUDE.md
 ```
 
 ### 2.1 固件架构原则
@@ -105,7 +109,7 @@ pio run -t clean
 
 环境名：`4d_systems_esp32s3_gen4_r8n16`。如果新增环境，用 `-e <env>` 指定。
 
-> **首次使用前**：复制 `lib/NetTime/secrets.h.example`（如有）或新建 `lib/NetTime/secrets.h`，填入 `WIFI_SSID`、`WIFI_PASSWORD`、`PC_HOST`。该文件已被 `.gitignore` 忽略，不会提交到版本库。
+> **首次使用前**：复制 `lib/NetTime/secrets.h.example`（如有）或新建 `lib/NetTime/secrets.h`，填入 `WIFI_SSID`、`WIFI_PASSWORD`、`PC_HOST`，并按需配置 `ANKI_DECK_ID` / `ANKI_DECK_NAME` / `ANKI_CARD_LIMIT`。该文件已被 `.gitignore` 忽略，不会提交到版本库。
 
 ### 4.2 py-fsrs（Python FSRS 参考实现）
 
@@ -201,7 +205,9 @@ python compare.py
    - `1/2/3/4` — 评分 Again/Hard/Good/Easy
    - `z` — 深睡 5 秒后唤醒（验证 RTC 保持）
    - `x` — 格式化 LittleFS 并重写示例卡（清数据重来）
-   - `d` — 从 PC 下载导入包（需 PC 在同一 WiFi 并开 HTTP 服务）
+   - `l` — 从 Anki 插件读取并打印卡组列表
+   - `d` — 从 Anki 插件下载卡片/状态/参数（需 PC 在同一 WiFi 并已打开 Anki）
+   - `u` — 上传离线复习记录并写回 Anki
 3. 观察串口输出的 `[FSRS] state=... s=... d=... -> next=...` 验证调度结果。
 
 ### 6.3 数据一致性验证
@@ -261,19 +267,22 @@ python compare.py
 - [ ] 同步修改 `Fsrs.cpp` 的数学公式
 - [ ] 更新 `FsrsParams::defaults()` 的默认值（若默认值变动）
 - [ ] 运行 `fsrs-check/compare.py` 确保与 py-fsrs 一致
-- [ ] 更新 `PortableAnki_V1_Plan.md` 中相关章节（若设计文档涉及）
+- [ ] 更新 `docs/PortableAnki_V1_Plan.md` 中相关章节（若设计文档涉及）
 
 ### 9.3 设备与 PC 的同步流程（当前实现）
 
-1. PC 运行 `python -m http.server 8000`（在 `import-pack/` 目录），或任何能 serve 静态文件的 HTTP 服务。
-2. 设备串口发送 `d`，`Sync::downloadImportPack()` 通过 WiFi 下载 `cards.jsonl`、`review_state.jsonl`、`decks.json`。
-3. 下载成功后写入 LittleFS，随后重载今日队列。
+1. PC 打开 Anki 并启用 `anki-addon/minianki_bridge` 插件（默认端口 8766）。
+2. 设备串口发送 `l`，通过 `/decks` 查看卡组列表；把选定的 `deckId` 或 `deck` 写入 `secrets.h`。
+3. 设备串口发送 `d`，`Sync::downloadImportPack()` 通过 WiFi 下载 `cards.jsonl`、`review_state.jsonl`、`decks.json`。
+4. 下载成功后写入 LittleFS，随后重载今日队列。
+5. 离线复习后串口发送 `u`，`Sync::uploadEvents()` 上传 `review_events.jsonl` 并由插件写回 Anki。
 
 ---
 
 ## 10. 参考文档
 
-- `PortableAnki_V1_Plan.md`：硬件方案、接线示例、外壳设计、十阶段开发路线图（中文）。
+- `docs/PortableAnki_V1_Plan.md`：硬件方案、接线示例、外壳设计、十阶段开发路线图（中文）。
+- `docs/PortableAnki_Remaining_Work.md`：当前闭环和剩余未实现功能清单。
 - `ESP4Anki/platformio.ini`：固件编译配置、第三方库依赖。
 - `py-fsrs/README.md`：Python FSRS 的 API 说明。
 
