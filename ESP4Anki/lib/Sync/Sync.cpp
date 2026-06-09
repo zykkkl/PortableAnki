@@ -43,6 +43,46 @@ static bool downloadTo(const String& url, const char* path) {
   return true;
 }
 
+bool Sync::uploadEvents() {
+  Serial.printf("[同步] 连接 WiFi: %s ...\n", WIFI_SSID);
+  if (!wifiConnect(15000)) {
+    Serial.println("[同步] WiFi 连接超时");
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    return false;
+  }
+
+  // 读出待上传的复习记录
+  File f = LittleFS.open("/review_events.jsonl", "r");
+  if (!f || f.size() == 0) {
+    if (f) f.close();
+    Serial.println("[同步] 没有待上传的复习记录");
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    return true;
+  }
+  String body = f.readString();
+  f.close();
+
+  HTTPClient http;
+  String url = String(PC_HOST) + "/upload";
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+  int code = http.POST(body);
+  String resp = http.getString();
+  http.end();
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
+
+  if (code == 200) {
+    Serial.printf("[同步] 上传成功: %s\n", resp.c_str());
+    LittleFS.remove("/review_events.jsonl");   // 已写回,清空避免重复上传
+    return true;
+  }
+  Serial.printf("[同步] 上传失败 code=%d: %s\n", code, resp.c_str());
+  return false;
+}
+
 bool Sync::downloadImportPack() {
   Serial.printf("[同步] 连接 WiFi: %s ...\n", WIFI_SSID);
   if (!wifiConnect(15000)) {

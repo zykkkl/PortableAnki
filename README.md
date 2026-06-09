@@ -34,7 +34,8 @@ Online:  Sync local changes and merge with desktop Anki state
 | **Rust FFI** | ✅ Complete | `rs-fsrs-c` wraps `rs-fsrs` via cbindgen into a C header |
 | **Serial UI** | 🔄 In Progress | Serial echo display for pre-hardware debugging; E-ink driver (GxEPD2) integration pending screen arrival |
 | **Physical Buttons** | 🔄 In Progress | Emulated via serial characters (`f` / `1` / `2` / `3` / `4`) until hardware buttons are wired |
-| **Two-Way Sync** | ⏳ Planned | Upload review events to desktop Anki and merge states |
+| **Anki Plugin (Bridge)** | ✅ Complete | `anki-addon/minianki_bridge` runs an HTTP service inside Anki: GET exports cards/state/params, POST writes review events back (memory state + due + revlog) |
+| **Two-Way Sync** | 🔄 In Progress | Write-back path verified (plugin + device upload code ready); full round-trip pending hardware |
 | **Backup & Restore** | ⏳ Planned | Full device backup JSON export/import |
 
 ### Target Hardware
@@ -76,6 +77,7 @@ pio device monitor
 | `z` | Deep sleep 5 s (test RTC retention) |
 | `x` | Format LittleFS and rewrite demo cards |
 | `d` | Download import pack from PC over Wi-Fi |
+| `u` | Upload review events back to Anki |
 
 ### Data Formats on Device
 
@@ -95,9 +97,10 @@ PortableAnki/
 │   └── lib/           # Modular libraries: Core, Ui, Review, Scheduler, Storage, Sync, NetTime, Clock, Power
 ├── py-fsrs/           # Official Python FSRS reference implementation (MIT)
 ├── rs-fsrs-c/         # Rust FFI → C header (cbindgen)
+├── anki-addon/        # Anki plugin (minianki_bridge): HTTP export + write-back
 ├── fsrs-check/        # C++ vs py-fsrs cross-check tool
-├── anki-tools/        # Anki Debug Console export script
-└── import-pack/       # Sample exported data
+├── anki-tools/        # Anki Debug Console scripts (export / write-back probe)
+└── import-pack/       # Exported data (gitignored — generated at runtime)
 ```
 
 ### Validation
@@ -139,7 +142,8 @@ PortableAnki 是一台**便携式离线 Anki 复习终端**。它基于 ESP32-S3
 | **Rust FFI** | ✅ 已完成 | `rs-fsrs-c` 通过 cbindgen 将 `rs-fsrs` 封装为 C 头文件 |
 | **串口 UI** | 🔄 进行中 | 串口回显用于无屏调试；GxEPD2 墨水屏驱动待屏幕到货后接入 |
 | **实体按键** | 🔄 进行中 | 目前通过串口字符模拟（`f` / `1` / `2` / `3` / `4`），待硬件焊接 |
-| **双向同步** | ⏳ 计划中 | 将复习事件上传至桌面 Anki 并合并状态 |
+| **Anki 插件(桥接)** | ✅ 已完成 | `anki-addon/minianki_bridge` 在 Anki 内起 HTTP 服务:GET 导出卡片/状态/参数,POST 把评分写回(memory state + due + revlog) |
+| **双向同步** | 🔄 进行中 | 写回链路已验证(插件 + 设备上传代码就绪);完整闭环待硬件 |
 | **备份与恢复** | ⏳ 计划中 | 完整设备备份 JSON 导出/导入 |
 
 ### 目标硬件
@@ -181,6 +185,7 @@ pio device monitor
 | `z` | 深睡 5 秒后唤醒（验证 RTC 保持） |
 | `x` | 格式化 LittleFS 并重写示例卡 |
 | `d` | 通过 Wi-Fi 从 PC 下载导入包 |
+| `u` | 上传复习记录写回 Anki |
 
 ### 设备端数据格式
 
@@ -200,9 +205,10 @@ PortableAnki/
 │   └── lib/           # 按模块划分的库：Core、Ui、Review、Scheduler、Storage、Sync、NetTime、Clock、Power
 ├── py-fsrs/           # 官方 Python FSRS 参考实现（MIT 协议）
 ├── rs-fsrs-c/         # Rust FFI → C 头文件（cbindgen）
+├── anki-addon/        # Anki 插件（minianki_bridge）：HTTP 导出 + 写回
 ├── fsrs-check/        # C++ 与 py-fsrs 对拍验证工具
-├── anki-tools/        # Anki Debug Console 导出脚本
-└── import-pack/       # 示例导出数据
+├── anki-tools/        # Anki Debug Console 脚本（导出 / 写回探针）
+└── import-pack/       # 导出数据（已 gitignore，运行时生成）
 ```
 
 ### 验证

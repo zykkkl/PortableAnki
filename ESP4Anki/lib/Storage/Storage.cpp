@@ -210,7 +210,7 @@ void Storage::saveReview(const ReviewState& st, Rating rating, long long now, lo
   File out = LittleFS.open(STATE_PATH, "w");
   if (out) { out.print(rebuilt); out.close(); }
 
-  // 2) 追加一条复习事件
+  // 2) 追加一条复习事件(含设备算出的完整新状态,供上传写回 Anki)
   File ev = LittleFS.open(EVENTS_PATH, "a");
   if (ev) {
     JsonDocument doc;
@@ -218,7 +218,13 @@ void Storage::saveReview(const ReviewState& st, Rating rating, long long now, lo
     doc["ease"]    = (int)rating;
     doc["timeMs"]  = timeMs;
     doc["ratedAt"] = now;
-    doc["nextDue"] = st.due;
+    doc["state"]   = (int)st.state;
+    doc["s"]       = st.stability;
+    doc["d"]       = st.difficulty;
+    doc["due"]     = st.due;
+    doc["step"]    = st.step;
+    doc["reps"]    = st.reps;
+    doc["lapses"]  = st.lapses;
     serializeJson(doc, ev);
     ev.print("\n");
     ev.close();

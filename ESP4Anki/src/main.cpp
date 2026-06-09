@@ -69,7 +69,7 @@ void setup() {
   Serial.begin(115200);
   delay(2000);
   Serial.println("Mini Anki OS - 真 FSRS + 时间 + 存储");
-  Serial.println("操作: f=翻面  1-4=评分  z=深睡  x=重置  d=从PC同步");
+  Serial.println("操作: f=翻面  1-4=评分  z=深睡  x=重置  d=下载  u=上传");
 
   // 从深睡唤醒且时间还在 -> 跳过联网;冷启动 -> NTP 对时
   if (Power::wokeFromDeepSleep() && Clock::isSet()) {
@@ -113,6 +113,15 @@ void loop() {
         startSession();
       } else {
         Serial.println("[同步] 下载失败(检查 PC 服务、PC_HOST 的 IP、是否同一 WiFi)");
+      }
+      continue;
+    }
+    if (c == 'u' || c == 'U') {            // 上传复习记录,写回 Anki
+      Serial.println("[同步] 开始上传复习记录...");
+      if (Sync::uploadEvents()) {
+        Serial.println("[同步] 上传完成");
+      } else {
+        Serial.println("[同步] 上传失败");
       }
       continue;
     }
