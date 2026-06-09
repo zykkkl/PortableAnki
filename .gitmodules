@@ -1,0 +1,6 @@
+[submodule "py-fsrs"]
+	path = py-fsrs
+	url = https://github.com/open-spaced-repetition/py-fsrs.git
+[submodule "rs-fsrs-c"]
+	path = rs-fsrs-c
+	url = https://github.com/open-spaced-repetition/rs-fsrs-c.git

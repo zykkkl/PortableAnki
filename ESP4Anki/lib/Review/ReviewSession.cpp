@@ -2,13 +2,13 @@
 #include <Arduino.h>
 #include <stdio.h>
 
-// 占位阈值:nextDue 距现在小于这个秒数,就算"今天还要再来"(留在队列);
-// 否则算"毕业",移出本轮。真实里这个判断应基于"今日结束时间(day cutoff)"。
-static const long long TODAY_HORIZON = 600;
-
-ReviewSession::ReviewSession(IDisplay* display)
-  : display_(display), state_(FLOW_EMPTY), currentIdx_(-1),
+ReviewSession::ReviewSession(IDisplay* display, IReviewSink* sink)
+  : display_(display), sink_(sink), state_(FLOW_EMPTY), currentIdx_(-1),
     waiting_(false), waitUntil_(0) {}
+
+void ReviewSession::setParams(const FsrsParams& p) {
+  scheduler_.setParams(p);
+}
 
 void ReviewSession::begin(const SessionItem* items, int n, long long now) {
   queue_.clear();
@@ -32,7 +32,7 @@ void ReviewSession::advance(long long now) {
     return;
   }
   SessionItem& it = queue_.at(idx);
-  if (it.state.due > now) {            // 队首还没到点(learning 卡在等几秒)
+  if (it.state.due > now) {            // 队首还没到点(learning 卡在等)
     waiting_   = true;
     waitUntil_ = it.state.due;
     char buf[48];
@@ -75,23 +75,22 @@ void ReviewSession::handleButton(Button b, long long now) {
       SessionItem& it  = queue_.at(currentIdx_);
       GradeResult  res = scheduler_.grade(it.state, rating, now);
 
-      // 更新这张卡的状态(内存)。
-      // TODO(M1): 这里要"立即写盘" —— 更新 review_state.jsonl + 追加 review_events.jsonl。
+      // 更新这张卡的状态(内存)
       it.state.state      = res.newState;
       it.state.stability  = res.newStability;
       it.state.difficulty = res.newDifficulty;
       it.state.due        = res.nextDue;
+      it.state.step       = res.newStep;
+      it.state.lastReview = now;
       it.state.reps      += 1;
       if (rating == RATING_AGAIN) it.state.lapses += 1;
 
-      Serial.printf("    [已保存] 评分=%d 下次=+%ld秒 (TODO: 写入 LittleFS)\n",
-                    (int)rating, (long)(res.nextDue - now));
+      // 立即持久化:交给注入的 sink(写 review_state + 追加 review_events)
+      if (sink_) sink_->onReviewed(it.state, rating, now);
 
-      // 今天还会再出现(learning)还是毕业(排到天级别)?
-      if (res.nextDue - now < TODAY_HORIZON) {
-        // 留在队列,due 已更新,稍后会再被选中
-      } else {
-        queue_.removeAt(currentIdx_);            // 毕业,移出本轮
+      // 毕业到 Review 就移出今日队列;仍在 Learning/Relearning 则留下当天重现
+      if (res.newState == CARD_REVIEW) {
+        queue_.removeAt(currentIdx_);
       }
       currentIdx_ = -1;
       advance(now);

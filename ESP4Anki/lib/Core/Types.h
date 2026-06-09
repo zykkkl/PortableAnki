@@ -40,10 +40,11 @@ enum CardState : uint8_t {
 };
 
 // ===== 卡片内容(对应 cards.jsonl 的子集)=====
+// front/back 用定长数组(不是指针),这样从文件读出的字符串有地方存。
 struct Card {
-  long long   cardId;
-  const char* front;
-  const char* back;
+  long long cardId;
+  char      front[64];
+  char      back[256];
 };
 
 // ===== 卡片复习状态(对应 review_state.jsonl)=====
@@ -55,6 +56,8 @@ struct ReviewState {
   long long due;        // 下次到期时间(与 now 同一时间基)
   int       reps;
   int       lapses;
+  int       step;       // learning/relearning 当前步;Review 用 -1。FSRS 需要
+  long long lastReview; // 上次复习 Unix 秒;-1 表示从未复习。FSRS 算 elapsed 用
 };
 
 // ===== 会话项:把"内容"和"状态"凑成一张待复习的卡 =====
